@@ -326,6 +326,20 @@
                     </div>
                 </section>
             </template>
+
+            <!-- Add New Board Fallback -->
+            <template x-if="!currentBoard">
+                <div class="mt-20 flex justify-center items-start min-h-screen">
+                    <button @click="addBoard()"
+                        class="px-3 py-2 bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 transition inline-flex gap-2 items-center justify-center rounded-xl lg:text-xl font-semibold text-sm"><span><svg
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" class="size-6 lg:size-10">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                        </span>Add New Board</button>
+                </div>
+
+            </template>
         </main>
     </div>
 
