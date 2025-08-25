@@ -34,6 +34,11 @@
 
 
     <style>
+        [x-cloak] {
+            display: none !important;
+        }
+
+
         /* Tailwind fine tuning */
         :root {
             color-scheme: light dark;
@@ -94,7 +99,7 @@
                                 </svg>
                             </span> Settings
                         </button>
-                        <div x-show="open" @click.away="open = false" x-transition
+                        <div x-cloak x-show="open" @click.away="open = false" x-transition
                             class="absolute right-0 mt-2 w-44 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg z-50">
                             <button @click="triggerImport(); open=false"
                                 class="w-full flex flex-row gap-2 text-left px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition">
@@ -126,7 +131,7 @@
                                     d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
                             </svg>
                             <!-- Dark mode icon -->
-                            <svg x-show="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            <svg x-cloak x-show="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" fill="none"
                                 viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
@@ -298,7 +303,8 @@
     </div>
 
     <!-- Toast / Undo -->
-    <div x-show="toast.current" x-transition.opacity.duration.200 class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
+    <div x-cloak x-show="toast.current" x-transition.opacity.duration.200
+        class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
         <div class="rounded-2xl bg-neutral-900 text-white shadow-lg px-4 py-3 flex items-center gap-4">
             <div x-text="toast.current?.message"></div>
             <button @click="undo()" x-show="toast.current?.lastAction"
@@ -337,31 +343,43 @@
 
     <!-- App Logic -->
     <script>
-        function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
+        function uid() {
+            return Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
 
         function kanbanApp() {
             return {
-                // Reactive state
+                // ======================
+                // Reactive State
+                // ======================
                 appName: 'KajKam',
                 appVersion: 'v1.0.0',
                 data: { boards: [] },
                 activeBoardId: null,
                 theme: 'auto',
                 dragging: { type: null, fromList: null, fromIndex: null, listIndex: null },
-                toast: { show: false, message: '', timer: null, lastAction: null },
-                dialog: { show: false, title: '', message: '', resolver: null },
+                toast: { queue: [], current: null, timer: null },
+                dialog: { show: false, title: '', message: '', resolver: null, inputValue: '', withInput: false },
 
                 get currentBoard() {
                     return this.data.boards.find(b => b.id === this.activeBoardId) || null;
                 },
 
-                // Init
+                // ======================
+                // Initialization
+                // ======================
                 init() {
-                    // theme
+                    this._initTheme();
+                    this._initData();
+                    this._restoreLastBoard();
+                    this._watchActiveBoard();
+                    this._initDragGhostHelpers();
+                },
+                _initTheme() {
                     const savedTheme = localStorage.getItem('kanbanTheme');
                     this.theme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-
-                    // data
+                },
+                _initData() {
                     const raw = localStorage.getItem('kanbanDataV1');
                     if (raw) {
                         try {
@@ -373,29 +391,35 @@
                     } else {
                         this.seed();
                     }
-
-                    // restore last visited board
+                },
+                _restoreLastBoard() {
                     const savedBoard = localStorage.getItem('kanbanActiveBoard');
                     if (savedBoard && this.data.boards.some(b => b.id === savedBoard)) {
                         this.activeBoardId = savedBoard;
                     } else {
                         this.activeBoardId = this.data.boards[0]?.id || null;
                     }
-
-                    // watch for activeBoardId changes and persist automatically
-                    this.$watch('activeBoardId', value => {
-                        localStorage.setItem('kanbanActiveBoard', value);
-                    });
-
-                    // DnD helpers for mobile
-                    document.addEventListener('dragstart', e => {
-                        if (e.target?.classList) e.target.classList.add('drag-ghost');
-                    });
-                    document.addEventListener('dragend', e => {
-                        if (e.target?.classList) e.target.classList.remove('drag-ghost');
-                    });
+                },
+                _watchActiveBoard() {
+                    this.$watch('activeBoardId', value => localStorage.setItem('kanbanActiveBoard', value));
+                },
+                _initDragGhostHelpers() {
+                    document.addEventListener('dragstart', e => { if (e.target?.classList) e.target.classList.add('drag-ghost'); });
+                    document.addEventListener('dragend', e => { if (e.target?.classList) e.target.classList.remove('drag-ghost'); });
                 },
 
+                // ======================
+                // Persistence
+                // ======================
+                persist() {
+                    localStorage.setItem('kanbanDataV1', JSON.stringify(this.data));
+                    localStorage.setItem('kanbanTheme', this.theme);
+                    localStorage.setItem('kanbanActiveBoard', this.activeBoardId);
+                },
+
+                // ======================
+                // Seed Data
+                // ======================
                 seed() {
                     this.data = {
                         boards: [
@@ -403,22 +427,9 @@
                                 id: uid(),
                                 name: 'Demo Board',
                                 lists: [
-                                    {
-                                        id: uid(), name: 'Backlog', cards: [
-                                            { id: uid(), title: 'Tap any card to edit the title' },
-                                            { id: uid(), title: 'Drag to reorder or move across lists' },
-                                        ]
-                                    },
-                                    {
-                                        id: uid(), name: 'In Progress', cards: [
-                                            { id: uid(), title: 'Inline editing supports Enter and Escape' },
-                                        ]
-                                    },
-                                    {
-                                        id: uid(), name: 'Done', cards: [
-                                            { id: uid(), title: 'Data persists in localStorage' },
-                                        ]
-                                    },
+                                    { id: uid(), name: 'Backlog', cards: [{ id: uid(), title: 'Tap any card to edit the title' }, { id: uid(), title: 'Drag to reorder or move across lists' }] },
+                                    { id: uid(), name: 'In Progress', cards: [{ id: uid(), title: 'Inline editing supports Enter and Escape' }] },
+                                    { id: uid(), name: 'Done', cards: [{ id: uid(), title: 'Data persists in localStorage' }] }
                                 ]
                             }
                         ]
@@ -427,19 +438,17 @@
                     this.persist();
                 },
 
-                persist() {
-                    localStorage.setItem('kanbanDataV1', JSON.stringify(this.data));
-                    localStorage.setItem('kanbanTheme', this.theme);
-                    localStorage.setItem('kanbanActiveBoard', this.activeBoardId);
-                },
-
-                /* Theme */
+                // ======================
+                // Theme
+                // ======================
                 toggleTheme() {
                     this.theme = this.theme === 'dark' ? 'light' : 'dark';
                     this.persist();
                 },
 
-                /* Boards */
+                // ======================
+                // Boards
+                // ======================
                 addBoard() {
                     this.openInputDialog('New Board', '', (confirmed, value) => {
                         if (confirmed && value.trim()) {
@@ -464,35 +473,21 @@
                     const idx = this.data.boards.findIndex(b => b.id === this.currentBoard.id);
                     if (idx === -1) return;
 
-                    const snapshot = JSON.parse(JSON.stringify(this.currentBoard)); // deep copy for undo
+                    const snapshot = JSON.parse(JSON.stringify(this.currentBoard));
 
                     const doDelete = () => {
-                        // Remove the board
                         this.data.boards.splice(idx, 1);
-
-                        // Switch to another board if any
                         this.activeBoardId = this.data.boards[0]?.id || null;
-
-                        // Persist data
                         this.persist();
-
-                        // Show undoable toast
-                        this.showToast('Board deleted', {
-                            type: 'restoreBoard',
-                            board: snapshot,
-                            index: idx
-                        });
+                        this.showToast('Board deleted', { type: 'restoreBoard', board: snapshot, index: idx });
                     };
 
-                    // Open confirmation dialog
-                    this.openDialog(
-                        'Delete board',
-                        'This will remove the board and its lists and cards.',
-                        confirmed => { if (confirmed) doDelete() }
-                    );
+                    this.openDialog('Delete board', 'This will remove the board and its lists and cards.', confirmed => { if (confirmed) doDelete(); });
                 },
 
-                /* Lists */
+                // ======================
+                // Lists
+                // ======================
                 addList() {
                     if (!this.currentBoard) return;
                     this.currentBoard.lists.push({ id: uid(), name: 'New list', cards: [] });
@@ -506,57 +501,33 @@
                     const list = this.currentBoard.lists[listIndex];
                     if (!list) return;
 
-                    // Deep copy for undo
                     const snapshot = JSON.parse(JSON.stringify(list));
-
-                    // Remove the list
                     this.currentBoard.lists.splice(listIndex, 1);
-
-                    // Persist changes
                     this.persist();
-
-                    // Show undoable toast
-                    this.showToast('List deleted', {
-                        type: 'restoreList',
-                        payload: {
-                            index: listIndex,
-                            list: snapshot
-                        }
-                    });
+                    this.showToast('List deleted', { type: 'restoreList', payload: { index: listIndex, list: snapshot } });
                 },
 
-                /* Cards */
+                // ======================
+                // Cards
+                // ======================
                 addCard(listIndex) {
                     const title = 'New card';
                     this.currentBoard.lists[listIndex].cards.push({ id: uid(), title });
                     this.$nextTick(() => this.persist());
                 },
-
                 confirmDeleteCard(listIndex, cardIndex) {
                     const card = this.currentBoard.lists[listIndex].cards[cardIndex];
                     if (!card) return;
 
-                    // Deep copy for undo
                     const snapshot = JSON.parse(JSON.stringify(card));
-
-                    // Remove the card
                     this.currentBoard.lists[listIndex].cards.splice(cardIndex, 1);
-
-                    // Persist changes
                     this.persist();
-
-                    // Show undoable toast
-                    this.showToast('Card deleted', {
-                        type: 'restoreCard',
-                        payload: {
-                            listIndex,
-                            cardIndex,
-                            card: snapshot
-                        }
-                    });
+                    this.showToast('Card deleted', { type: 'restoreCard', payload: { listIndex, cardIndex, card: snapshot } });
                 },
 
-                /* Drag Lists */
+                // ======================
+                // Drag Lists
+                // ======================
                 startListDrag(ev, listIndex) {
                     this.dragging = { type: 'list', fromIndex: listIndex };
                     ev.dataTransfer.setData('text/list', String(listIndex));
@@ -565,9 +536,10 @@
                 handleListDrop(ev) {
                     const from = parseInt(ev.dataTransfer.getData('text/list'));
                     if (Number.isNaN(from)) return;
+
                     const wrap = document.getElementById('lists-wrap');
                     const children = Array.from(wrap.querySelectorAll('article[draggable="true"]'));
-                    // find index by position
+
                     const x = ev.clientX;
                     let to = children.length - 1;
                     for (let i = 0; i < children.length; i++) {
@@ -583,29 +555,27 @@
                     this.endDrag(ev);
                 },
 
-                /* Drag Cards */
+                // ======================
+                // Drag Cards
+                // ======================
                 startCardDrag(ev, fromList, fromIndex) {
                     this.dragging = { type: 'card', fromList, fromIndex };
                     ev.dataTransfer.setData('text/card', JSON.stringify({ fromList, fromIndex }));
                     ev.dataTransfer.dropEffect = 'move';
                     ev.dataTransfer.effectAllowed = 'move';
                 },
-                onCardDragOver(ev) {
-                    ev.currentTarget.classList.add('drag-over');
-                },
-                onCardDragLeave(ev) {
-                    ev.currentTarget.classList.remove('drag-over');
-                },
+                onCardDragOver(ev) { ev.currentTarget.classList.add('drag-over'); },
+                onCardDragLeave(ev) { ev.currentTarget.classList.remove('drag-over'); },
                 onCardDrop(ev, toList) {
                     ev.currentTarget.classList.remove('drag-over');
                     const payload = ev.dataTransfer.getData('text/card');
                     if (!payload) return;
+
                     const { fromList, fromIndex } = JSON.parse(payload);
                     const src = this.currentBoard.lists[fromList].cards;
                     const [card] = src.splice(fromIndex, 1);
                     const target = this.currentBoard.lists[toList].cards;
 
-                    // Insert position by y coordinate
                     const y = ev.clientY;
                     const cardsEls = Array.from(ev.currentTarget.querySelectorAll('[draggable="true"]'));
                     let toIndex = target.length;
@@ -618,12 +588,13 @@
                     this.$nextTick(() => this.persist());
                 },
                 endDrag(ev) {
-                    // clean
                     document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
                     this.dragging = { type: null, fromList: null, fromIndex: null };
                 },
 
-                /* Export / Import */
+                // ======================
+                // Export / Import
+                // ======================
                 exportJSON() {
                     const blob = new Blob([JSON.stringify({ data: this.data, activeBoardId: this.activeBoardId, theme: this.theme }, null, 2)], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
@@ -635,9 +606,7 @@
                     a.remove();
                     URL.revokeObjectURL(url);
                 },
-                triggerImport() {
-                    document.getElementById('importInput').click();
-                },
+                triggerImport() { document.getElementById('importInput').click(); },
                 handleImport(e) {
                     const file = e.target.files[0];
                     if (!file) return;
@@ -659,34 +628,14 @@
                     reader.readAsText(file);
                 },
 
-                /* Toast / Undo */
-
-                hideToast() {
-                    this.toast.show = false;
-                    this.toast.message = '';
-                    this.toast.timer = null;
-                    this.toast.lastAction = null;
-                },
-                /* Simple modal */
+                // ======================
+                // Dialog / Input Dialog
+                // ======================
                 openDialog(title, message, cb) {
                     this.dialog.title = title;
                     this.dialog.message = message;
                     this.dialog.resolver = cb;
                     this.dialog.show = true;
-                },
-                closeDialog(confirmed) {
-                    const cb = this.dialog.resolver;
-                    this.dialog.show = false;
-                    this.dialog.resolver = null;
-                    if (typeof cb === 'function') cb(confirmed);
-                },
-                dialog: {
-                    show: false,
-                    title: '',
-                    message: '',
-                    resolver: null,
-                    inputValue: '',
-                    withInput: false
                 },
                 openInputDialog(title, defaultValue, cb) {
                     this.dialog.title = title;
@@ -696,51 +645,35 @@
                     this.dialog.resolver = cb;
                     this.dialog.show = true;
                 },
-
                 closeDialog(confirmed) {
                     const cb = this.dialog.resolver;
                     const val = this.dialog.inputValue;
+                    const withInput = this.dialog.withInput;
                     this.dialog.show = false;
                     this.dialog.resolver = null;
-                    const withInput = this.dialog.withInput;
                     this.dialog.withInput = false;
                     this.dialog.inputValue = '';
-                    if (typeof cb === 'function') {
-                        cb(confirmed, withInput ? val : null);
-                    }
-                },
-                toast: {
-                    queue: [],       // holds pending toast messages
-                    current: null,   // the currently visible toast
-                    timer: null,
-                },
-                // Show a new toast message
-                showToast(message, lastAction = null, duration = 3500) {
-                    this.toast.queue.push({ message, lastAction, duration });
-                    // If no toast is currently showing, display the next one
-                    if (!this.toast.current) {
-                        this._showNextToast();
-                    }
+                    if (typeof cb === 'function') cb(confirmed, withInput ? val : null);
                 },
 
-                // Internal function to display the next toast in the queue
+                // ======================
+                // Toast / Undo
+                // ======================
+                showToast(message, lastAction = null, duration = 3500) {
+                    this.toast.queue.push({ message, lastAction, duration });
+                    if (!this.toast.current) this._showNextToast();
+                },
                 _showNextToast() {
                     if (!this.toast.queue.length) {
                         this.toast.current = null;
                         return;
                     }
-
                     this.toast.current = this.toast.queue.shift();
                     this.toast.timer = setTimeout(() => {
-                        // fade out
                         this.toast.current = null;
-                        setTimeout(() => {
-                            this._showNextToast();
-                        }, 200); // match your x-transition duration
+                        setTimeout(() => this._showNextToast(), 200);
                     }, this.toast.current.duration);
                 },
-
-                // Undo action on the current toast
                 undo() {
                     if (!this.toast.current?.lastAction) return;
                     const act = this.toast.current.lastAction;
@@ -762,16 +695,15 @@
                     this.persist();
                     this.dismissToast();
                 },
-
-                // Manually dismiss current toast
                 dismissToast() {
                     clearTimeout(this.toast.timer);
                     this.toast.current = null;
                     this._showNextToast();
                 }
-            }
+            };
         }
     </script>
+
 </body>
 
 </html>
