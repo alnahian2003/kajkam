@@ -561,18 +561,21 @@
                     ev.dataTransfer.effectAllowed = 'move';
                 },
                 handleListDrop(ev) {
-                    const from = parseInt(ev.dataTransfer.getData('text/list'));
-                    if (Number.isNaN(from)) return;
+                    ev.preventDefault();
+                    if (this.dragging.type !== 'list') return;
+
+                    const from = this.dragging.fromIndex;
+                    if (from == null) return;
 
                     const wrap = document.getElementById('lists-wrap');
                     const children = Array.from(wrap.querySelectorAll('article[draggable="true"]'));
-
                     const x = ev.clientX;
                     let to = children.length - 1;
                     for (let i = 0; i < children.length; i++) {
                         const r = children[i].getBoundingClientRect();
                         if (x < r.left + r.width / 2) { to = i; break; }
                     }
+
                     if (from === to) return this.endDrag(ev);
 
                     const lists = this.currentBoard.lists;
@@ -594,7 +597,12 @@
                 onCardDragOver(ev) { ev.currentTarget.classList.add('drag-over'); },
                 onCardDragLeave(ev) { ev.currentTarget.classList.remove('drag-over'); },
                 onCardDrop(ev, toList) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+
+                    // Remove drag-over class immediately
                     ev.currentTarget.classList.remove('drag-over');
+
                     const payload = ev.dataTransfer.getData('text/card');
                     if (!payload) return;
 
@@ -603,6 +611,7 @@
                     const [card] = src.splice(fromIndex, 1);
                     const target = this.currentBoard.lists[toList].cards;
 
+                    // Insert by Y coordinate
                     const y = ev.clientY;
                     const cardsEls = Array.from(ev.currentTarget.querySelectorAll('[draggable="true"]'));
                     let toIndex = target.length;
