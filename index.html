@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en" x-data="kanbanApp()" x-init="init()" :class="theme === 'dark' ? 'dark' : ''">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title x-text="appName"></title>
+
+    <!-- TailwindCSS v4 via CDN (no plugins) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Tailwind config
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ["Rubik", "Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Noto Sans", "Ubuntu", "Cantarell", "Helvetica Neue", "Arial", "sans-serif"],
+                    },
+                    boxShadow: {
+                        soft: "0 1px 2px 0 rgb(0 0 0 / 0.05), 0 8px 16px -4px rgb(0 0 0 / 0.08)",
+                    }
+                }
+            },
+            darkMode: "class"
+        }
+    </script>
+
+    <!-- AlpineJS -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+
+    <style>
+        /* Tailwind fine tuning */
+        :root {
+            color-scheme: light dark;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            border-radius: 9999px;
+        }
+
+        .drag-ghost {
+            opacity: .6;
+        }
+
+        .drag-over {
+            outline: 2px dashed oklch(70.4% 0.14 182.503);
+            outline-offset: 4px;
+        }
+
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body class="bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 antialiased">
+    <!-- App Shell -->
+    <div class="min-h-dvh flex flex-col">
+        <!-- Topbar -->
+        <header
+            class="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-neutral-900/60 border-b border-neutral-200 dark:border-neutral-800">
+            <div class="mx-auto px-4 py-3 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <div class="h-8 w-8 rounded-2xl bg-teal-600 shadow ring-1 ring-black/5 grid place-items-center text-white font-bold"
+                        x-text="appName.charAt(0)"></div>
+                    <h1 class="text-lg font-semibold tracking-tight" x-text="appName"></h1>
+                </div>
+
+                <div class="flex items-center justify-between gap-3">
+                    <!-- Actions -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open"
+                            class="px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[.98] shadow-sm transition flex items-center gap-1">
+                            <span>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="1.5" stroke="currentColor" class="size-5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                </svg>
+                            </span> Settings
+                        </button>
+                        <div x-show="open" @click.away="open = false" x-transition
+                            class="absolute right-0 mt-2 w-44 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg z-50">
+                            <button @click="triggerImport(); open=false"
+                                class="w-full flex flex-row gap-2 text-left px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition">
+                                <span><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor" class="size-5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
+                                    </svg>
+                                </span> Import JSON</button>
+                            <button @click="exportJSON(); open=false"
+                                class="w-full flex flex-row gap-2 text-left px-4 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"><span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor" class="size-5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                </span>
+                                Export JSON</button>
+                        </div>
+                    </div>
+                    <button @click="toggleTheme()"
+                        class="px-3 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[.98] shadow-sm transition"
+                        :aria-pressed="theme === 'dark'">
+                        <span class="theme-toggler">
+                            <!-- Light mode icon -->
+                            <svg x-show="theme !== 'dark'" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+                            </svg>
+                            <!-- Dark mode icon -->
+                            <svg x-show="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+                            </svg>
+                        </span>
+                    </button>
+                    <input id="importInput" type="file" accept="application/json" class="hidden"
+                        @change="handleImport($event)" />
+                </div>
+            </div>
+        </header>
+
+        <!-- Board Content -->
+        <main class="flex-1 overflow-x-auto">
+            <template x-if="currentBoard">
+                <section class="mx-auto max-w-[140rem]">
+                    <div class="p-4 md:p-6 flex gap-4 md:gap-6 flex flex-row items-center justify-start flex-wrap">
+                        <div class="flex flex-row justify-start items-center flex-1 gap-4">
+                            <h2 class="text-3xl font-semibold tracking-tight" x-text="currentBoard.name"></h2>
+
+                            <!-- Inline Rename Button -->
+                            <button @click="promptRenameBoard()"
+                                class="p-2 rounded-lg hover:bg-neutral-100 active:bg-neutral-200/60 dark:hover:bg-neutral-800 dark:active:bg-neutral-700 transition flex flex-row justify-center items-center">
+                                <span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor" class="size-6">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
+
+                        <!-- Board selector -->
+                        <div class="flex justify-center">
+                            <span class="inline-flex items-center pr-3">Board:</span>
+                            <div
+                                class="inline-flex items-stretch rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden">
+                                <select name="active_board" x-model="activeBoardId"
+                                    class="px-3 py-2 bg-transparent focus:outline-none">
+                                    <template x-for="b in data.boards" :key="b.id">
+                                        <option :value="b.id" x-text="b.name" :selected="b.id === activeBoardId">
+                                        </option>
+                                    </template>
+                                </select>
+                                <!-- <button @click="promptRenameBoard()"
+                                    class="px-3 py-2 hover:bg-neutral-100 active:bg-neutral-200/60 dark:hover:bg-neutral-800 dark:active:bg-neutral-700 transition flex flex-row justify-center items-center gap-2"><span><svg
+                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke-width="1.5" stroke="currentColor" class="size-4">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                        </svg>
+                                    </span> Rename</button> -->
+
+                                <button @click="confirmDeleteBoard()"
+                                    class="px-3 py-2 hover:bg-neutral-100 active:bg-neutral-200/60 dark:hover:bg-neutral-800 dark:active:bg-neutral-700 transition inline-flex flex-row justify-center items-center gap-2"><span><svg
+                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke-width="1.5" stroke="currentColor" class="size-4">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                        </svg>
+                                    </span>
+                                    Delete</button>
+
+                                <button @click="addBoard()"
+                                    class="px-3 py-2 bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 transition inline-flex gap-2 items-center justify-center"><span><svg
+                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke-width="1.5" stroke="currentColor" class="size-5">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M12 4.5v15m7.5-7.5h-15" />
+                                        </svg>
+                                    </span>New</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="lists-wrap" class="p-4 md:p-6 flex gap-4 md:gap-6 items-start min-h-[70vh]"
+                        x-sortable.lists @dragover.prevent @drop="handleListDrop($event)">
+                        <!-- Each List -->
+                        <template x-for="(list, listIndex) in currentBoard.lists" :key="list.id">
+                            <article
+                                class="w-72 md:w-80 shrink-0 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm"
+                                draggable="true" @dragstart="startListDrag($event, listIndex)"
+                                @dragend="endDrag($event)">
+                                <header class="p-3 flex items-center justify-center gap-2">
+                                    <input
+                                        class=" w-full bg-transparent font-medium px-2 py-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                        :value="list.name" @change="renameList(listIndex, $event.target.value)"
+                                        @keydown.enter.prevent="$event.target.blur()" aria-label="List name" />
+
+                                    <div class="flex items-center justify-end gap-2 w-full max-w-full flex-1">
+                                        <button @click="addCard(listIndex)"
+                                            class="px-2 shrink-0 py-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+                                            title="Add card"><span><svg xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                                                    class="size-5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M12 4.5v15m7.5-7.5h-15" />
+                                                </svg>
+                                            </span></button>
+                                        <button @click="confirmDeleteList(listIndex)"
+                                            class="px-2 shrink-0 py-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+                                            title="Delete list"><span><svg xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                                    stroke="currentColor" class="size-5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M6 18 18 6M6 6l12 12" />
+                                                </svg>
+                                            </span></button>
+                                    </div>
+                                </header>
+
+                                <!-- Cards -->
+                                <div class="px-3 pb-3">
+                                    <div class="space-y-2 min-h-[2.5rem] transition-all" :data-list-index="listIndex"
+                                        @dragover.prevent="onCardDragOver($event)" @dragleave="onCardDragLeave($event)"
+                                        @drop="onCardDrop($event, listIndex)">
+                                        <template x-for="(card, cardIndex) in list.cards" :key="card.id">
+                                            <div class="group rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-sm hover:shadow transition hover:border-teal-300 dark:hover:border-teal-700"
+                                                draggable="true"
+                                                @dragstart="startCardDrag($event, listIndex, cardIndex)"
+                                                @dragend="endDrag($event)">
+                                                <div class="p-3 flex items-start gap-2">
+                                                    <textarea
+                                                        class="flex-1 bg-transparent resize-none leading-snug min-h-[2.25rem] px-1 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                        x-model="card.title" @change="persist()"
+                                                        @keydown.enter.stop.prevent="$event.target.blur()"
+                                                        @keydown.escape.stop.prevent="$event.target.blur()"
+                                                        aria-label="Card title"></textarea>
+                                                    <button @click="confirmDeleteCard(listIndex, cardIndex)"
+                                                        class="h-7 w-7 rounded-md grid place-items-center opacity-0 group-hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+                                                        title="Delete card"><span><svg
+                                                                xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                                viewBox="0 0 24 24" stroke-width="1.5"
+                                                                stroke="currentColor" class="size-4">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0">
+                                                                </path>
+                                                            </svg>
+                                                        </span></button>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <!-- Card add affordance -->
+                                        <button @click="addCard(listIndex)"
+                                            class="w-full text-left px-3 py-2 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 hover:border-teal-400 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-500/10 transition inline-flex items-center justify-start gap-2">
+                                            <span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                                    stroke-width="1.5" stroke="currentColor" class="size-5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M12 4.5v15m7.5-7.5h-15"></path>
+                                                </svg>
+                                            </span> Add a card
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        </template>
+
+                        <!-- New List button -->
+                        <button @click="addList()"
+                            class="w-72 md:w-80 shrink-0 rounded-2xl border border-dashed border-neutral-300 dark:border-neutral-800 bg-white/60 dark:bg-neutral-900/60 hover:border-teal-400 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-500/10 text-left p-4 transition">
+                            + New list
+                        </button>
+                    </div>
+                </section>
+            </template>
+        </main>
+    </div>
+
+    <!-- Toast / Undo -->
+    <div x-show="toast.current" x-transition.opacity.duration.200 class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
+        <div class="rounded-2xl bg-neutral-900 text-white shadow-lg px-4 py-3 flex items-center gap-4">
+            <div x-text="toast.current?.message"></div>
+            <button @click="undo()" x-show="toast.current?.lastAction"
+                class="px-3 py-1 rounded-lg bg-teal-500 hover:bg-teal-600 active:bg-teal-700 transition text-white">
+                Undo
+            </button>
+            <button @click="dismissToast()" class="px-2 py-1 rounded-lg hover:bg-neutral-800">Dismiss</button>
+        </div>
+    </div>
+
+
+    <!-- Simple dialogs -->
+    <template x-if="dialog.show">
+        <div class="fixed inset-0 z-50 grid place-items-center">
+            <div class="absolute inset-0 bg-black/40"></div>
+            <div
+                class="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl w-full max-w-md p-5">
+                <h2 class="text-base font-semibold mb-2" x-text="dialog.title"></h2>
+                <p x-show="!dialog.withInput" class="text-sm text-neutral-600 dark:text-neutral-400 mb-4"
+                    x-text="dialog.message"></p>
+
+                <div x-show="dialog.withInput" class="mb-4">
+                    <input type="text" x-model="dialog.inputValue"
+                        class="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        @keydown.enter.prevent="closeDialog(true)" @keydown.escape.prevent="closeDialog(false)" />
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button @click="closeDialog(false)"
+                        class="px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800">Cancel</button>
+                    <button @click="closeDialog(true)"
+                        class="px-3 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- App Logic -->
+    <script>
+        function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
+
+        function kanbanApp() {
+            return {
+                // Reactive state
+                appName: 'KajKam',
+                appVersion: 'v1.0.0',
+                data: { boards: [] },
+                activeBoardId: null,
+                theme: 'auto',
+                dragging: { type: null, fromList: null, fromIndex: null, listIndex: null },
+                toast: { show: false, message: '', timer: null, lastAction: null },
+                dialog: { show: false, title: '', message: '', resolver: null },
+
+                get currentBoard() {
+                    return this.data.boards.find(b => b.id === this.activeBoardId) || null;
+                },
+
+                // Init
+                init() {
+                    // theme
+                    const savedTheme = localStorage.getItem('kanbanTheme');
+                    this.theme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+                    // data
+                    const raw = localStorage.getItem('kanbanDataV1');
+                    if (raw) {
+                        try {
+                            this.data = JSON.parse(raw);
+                            this.activeBoardId = this.data.boards[0]?.id || null;
+                        } catch {
+                            this.seed();
+                        }
+                    } else {
+                        this.seed();
+                    }
+
+                    // restore last visited board
+                    const savedBoard = localStorage.getItem('kanbanActiveBoard');
+                    if (savedBoard && this.data.boards.some(b => b.id === savedBoard)) {
+                        this.activeBoardId = savedBoard;
+                    } else {
+                        this.activeBoardId = this.data.boards[0]?.id || null;
+                    }
+
+                    // watch for activeBoardId changes and persist automatically
+                    this.$watch('activeBoardId', value => {
+                        localStorage.setItem('kanbanActiveBoard', value);
+                    });
+
+                    // DnD helpers for mobile
+                    document.addEventListener('dragstart', e => {
+                        if (e.target?.classList) e.target.classList.add('drag-ghost');
+                    });
+                    document.addEventListener('dragend', e => {
+                        if (e.target?.classList) e.target.classList.remove('drag-ghost');
+                    });
+                },
+
+                seed() {
+                    this.data = {
+                        boards: [
+                            {
+                                id: uid(),
+                                name: 'Demo Board',
+                                lists: [
+                                    {
+                                        id: uid(), name: 'Backlog', cards: [
+                                            { id: uid(), title: 'Tap any card to edit the title' },
+                                            { id: uid(), title: 'Drag to reorder or move across lists' },
+                                        ]
+                                    },
+                                    {
+                                        id: uid(), name: 'In Progress', cards: [
+                                            { id: uid(), title: 'Inline editing supports Enter and Escape' },
+                                        ]
+                                    },
+                                    {
+                                        id: uid(), name: 'Done', cards: [
+                                            { id: uid(), title: 'Data persists in localStorage' },
+                                        ]
+                                    },
+                                ]
+                            }
+                        ]
+                    };
+                    this.activeBoardId = this.data.boards[0].id;
+                    this.persist();
+                },
+
+                persist() {
+                    localStorage.setItem('kanbanDataV1', JSON.stringify(this.data));
+                    localStorage.setItem('kanbanTheme', this.theme);
+                    localStorage.setItem('kanbanActiveBoard', this.activeBoardId);
+                },
+
+                /* Theme */
+                toggleTheme() {
+                    this.theme = this.theme === 'dark' ? 'light' : 'dark';
+                    this.persist();
+                },
+
+                /* Boards */
+                addBoard() {
+                    this.openInputDialog('New Board', '', (confirmed, value) => {
+                        if (confirmed && value.trim()) {
+                            this.data.boards.push({ id: uid(), name: value.trim(), lists: [] });
+                            this.activeBoardId = this.data.boards[this.data.boards.length - 1].id;
+                            this.persist();
+                        }
+                    });
+                },
+                promptRenameBoard() {
+                    if (!this.currentBoard) return;
+                    this.openInputDialog('Rename Board', this.currentBoard.name, (confirmed, value) => {
+                        if (confirmed && value.trim()) {
+                            this.currentBoard.name = value.trim();
+                            this.persist();
+                        }
+                    });
+                },
+                confirmDeleteBoard() {
+                    if (!this.currentBoard) return;
+
+                    const idx = this.data.boards.findIndex(b => b.id === this.currentBoard.id);
+                    if (idx === -1) return;
+
+                    const snapshot = JSON.parse(JSON.stringify(this.currentBoard)); // deep copy for undo
+
+                    const doDelete = () => {
+                        // Remove the board
+                        this.data.boards.splice(idx, 1);
+
+                        // Switch to another board if any
+                        this.activeBoardId = this.data.boards[0]?.id || null;
+
+                        // Persist data
+                        this.persist();
+
+                        // Show undoable toast
+                        this.showToast('Board deleted', {
+                            type: 'restoreBoard',
+                            board: snapshot,
+                            index: idx
+                        });
+                    };
+
+                    // Open confirmation dialog
+                    this.openDialog(
+                        'Delete board',
+                        'This will remove the board and its lists and cards.',
+                        confirmed => { if (confirmed) doDelete() }
+                    );
+                },
+
+                /* Lists */
+                addList() {
+                    if (!this.currentBoard) return;
+                    this.currentBoard.lists.push({ id: uid(), name: 'New list', cards: [] });
+                    this.persist();
+                },
+                renameList(listIndex, name) {
+                    this.currentBoard.lists[listIndex].name = name || 'Untitled';
+                    this.persist();
+                },
+                confirmDeleteList(listIndex) {
+                    const list = this.currentBoard.lists[listIndex];
+                    if (!list) return;
+
+                    // Deep copy for undo
+                    const snapshot = JSON.parse(JSON.stringify(list));
+
+                    // Remove the list
+                    this.currentBoard.lists.splice(listIndex, 1);
+
+                    // Persist changes
+                    this.persist();
+
+                    // Show undoable toast
+                    this.showToast('List deleted', {
+                        type: 'restoreList',
+                        payload: {
+                            index: listIndex,
+                            list: snapshot
+                        }
+                    });
+                },
+
+                /* Cards */
+                addCard(listIndex) {
+                    const title = 'New card';
+                    this.currentBoard.lists[listIndex].cards.push({ id: uid(), title });
+                    this.$nextTick(() => this.persist());
+                },
+
+                confirmDeleteCard(listIndex, cardIndex) {
+                    const card = this.currentBoard.lists[listIndex].cards[cardIndex];
+                    if (!card) return;
+
+                    // Deep copy for undo
+                    const snapshot = JSON.parse(JSON.stringify(card));
+
+                    // Remove the card
+                    this.currentBoard.lists[listIndex].cards.splice(cardIndex, 1);
+
+                    // Persist changes
+                    this.persist();
+
+                    // Show undoable toast
+                    this.showToast('Card deleted', {
+                        type: 'restoreCard',
+                        payload: {
+                            listIndex,
+                            cardIndex,
+                            card: snapshot
+                        }
+                    });
+                },
+
+                /* Drag Lists */
+                startListDrag(ev, listIndex) {
+                    this.dragging = { type: 'list', fromIndex: listIndex };
+                    ev.dataTransfer.setData('text/list', String(listIndex));
+                    ev.dataTransfer.effectAllowed = 'move';
+                },
+                handleListDrop(ev) {
+                    const from = parseInt(ev.dataTransfer.getData('text/list'));
+                    if (Number.isNaN(from)) return;
+                    const wrap = document.getElementById('lists-wrap');
+                    const children = Array.from(wrap.querySelectorAll('article[draggable="true"]'));
+                    // find index by position
+                    const x = ev.clientX;
+                    let to = children.length - 1;
+                    for (let i = 0; i < children.length; i++) {
+                        const r = children[i].getBoundingClientRect();
+                        if (x < r.left + r.width / 2) { to = i; break; }
+                    }
+                    if (from === to) return this.endDrag(ev);
+
+                    const lists = this.currentBoard.lists;
+                    const [moved] = lists.splice(from, 1);
+                    lists.splice(to, 0, moved);
+                    this.persist();
+                    this.endDrag(ev);
+                },
+
+                /* Drag Cards */
+                startCardDrag(ev, fromList, fromIndex) {
+                    this.dragging = { type: 'card', fromList, fromIndex };
+                    ev.dataTransfer.setData('text/card', JSON.stringify({ fromList, fromIndex }));
+                    ev.dataTransfer.dropEffect = 'move';
+                    ev.dataTransfer.effectAllowed = 'move';
+                },
+                onCardDragOver(ev) {
+                    ev.currentTarget.classList.add('drag-over');
+                },
+                onCardDragLeave(ev) {
+                    ev.currentTarget.classList.remove('drag-over');
+                },
+                onCardDrop(ev, toList) {
+                    ev.currentTarget.classList.remove('drag-over');
+                    const payload = ev.dataTransfer.getData('text/card');
+                    if (!payload) return;
+                    const { fromList, fromIndex } = JSON.parse(payload);
+                    const src = this.currentBoard.lists[fromList].cards;
+                    const [card] = src.splice(fromIndex, 1);
+                    const target = this.currentBoard.lists[toList].cards;
+
+                    // Insert position by y coordinate
+                    const y = ev.clientY;
+                    const cardsEls = Array.from(ev.currentTarget.querySelectorAll('[draggable="true"]'));
+                    let toIndex = target.length;
+                    for (let i = 0; i < cardsEls.length; i++) {
+                        const r = cardsEls[i].getBoundingClientRect();
+                        if (y < r.top + r.height / 2) { toIndex = i; break; }
+                    }
+                    target.splice(toIndex, 0, card);
+
+                    this.$nextTick(() => this.persist());
+                },
+                endDrag(ev) {
+                    // clean
+                    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                    this.dragging = { type: null, fromList: null, fromIndex: null };
+                },
+
+                /* Export / Import */
+                exportJSON() {
+                    const blob = new Blob([JSON.stringify({ data: this.data, activeBoardId: this.activeBoardId, theme: this.theme }, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'kanban-export.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                },
+                triggerImport() {
+                    document.getElementById('importInput').click();
+                },
+                handleImport(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        try {
+                            const parsed = JSON.parse(reader.result);
+                            if (!parsed?.data?.boards) throw new Error('Invalid file');
+                            this.data = parsed.data;
+                            this.activeBoardId = parsed.activeBoardId || this.data.boards[0]?.id || null;
+                            this.theme = parsed.theme || this.theme;
+                            this.persist();
+                        } catch (err) {
+                            alert('Import failed: ' + err.message);
+                        } finally {
+                            e.target.value = '';
+                        }
+                    };
+                    reader.readAsText(file);
+                },
+
+                /* Toast / Undo */
+
+                hideToast() {
+                    this.toast.show = false;
+                    this.toast.message = '';
+                    this.toast.timer = null;
+                    this.toast.lastAction = null;
+                },
+                /* Simple modal */
+                openDialog(title, message, cb) {
+                    this.dialog.title = title;
+                    this.dialog.message = message;
+                    this.dialog.resolver = cb;
+                    this.dialog.show = true;
+                },
+                closeDialog(confirmed) {
+                    const cb = this.dialog.resolver;
+                    this.dialog.show = false;
+                    this.dialog.resolver = null;
+                    if (typeof cb === 'function') cb(confirmed);
+                },
+                dialog: {
+                    show: false,
+                    title: '',
+                    message: '',
+                    resolver: null,
+                    inputValue: '',
+                    withInput: false
+                },
+                openInputDialog(title, defaultValue, cb) {
+                    this.dialog.title = title;
+                    this.dialog.withInput = true;
+                    this.dialog.inputValue = defaultValue || '';
+                    this.dialog.message = '';
+                    this.dialog.resolver = cb;
+                    this.dialog.show = true;
+                },
+
+                closeDialog(confirmed) {
+                    const cb = this.dialog.resolver;
+                    const val = this.dialog.inputValue;
+                    this.dialog.show = false;
+                    this.dialog.resolver = null;
+                    const withInput = this.dialog.withInput;
+                    this.dialog.withInput = false;
+                    this.dialog.inputValue = '';
+                    if (typeof cb === 'function') {
+                        cb(confirmed, withInput ? val : null);
+                    }
+                },
+                toast: {
+                    queue: [],       // holds pending toast messages
+                    current: null,   // the currently visible toast
+                    timer: null,
+                },
+                // Show a new toast message
+                showToast(message, lastAction = null, duration = 3500) {
+                    this.toast.queue.push({ message, lastAction, duration });
+                    // If no toast is currently showing, display the next one
+                    if (!this.toast.current) {
+                        this._showNextToast();
+                    }
+                },
+
+                // Internal function to display the next toast in the queue
+                _showNextToast() {
+                    if (!this.toast.queue.length) {
+                        this.toast.current = null;
+                        return;
+                    }
+
+                    this.toast.current = this.toast.queue.shift();
+                    this.toast.timer = setTimeout(() => {
+                        // fade out
+                        this.toast.current = null;
+                        setTimeout(() => {
+                            this._showNextToast();
+                        }, 200); // match your x-transition duration
+                    }, this.toast.current.duration);
+                },
+
+                // Undo action on the current toast
+                undo() {
+                    if (!this.toast.current?.lastAction) return;
+                    const act = this.toast.current.lastAction;
+
+                    if (act.type === 'restoreCard') {
+                        const { listIndex, cardIndex, card } = act.payload;
+                        this.currentBoard.lists[listIndex].cards.splice(cardIndex, 0, card);
+                    }
+                    if (act.type === 'restoreList') {
+                        const { index, list } = act.payload;
+                        this.currentBoard.lists.splice(index, 0, list);
+                    }
+                    if (act.type === 'restoreBoard') {
+                        const { board, index } = act;
+                        this.data.boards.splice(index, 0, board);
+                        this.activeBoardId = board.id;
+                    }
+
+                    this.persist();
+                    this.dismissToast();
+                },
+
+                // Manually dismiss current toast
+                dismissToast() {
+                    clearTimeout(this.toast.timer);
+                    this.toast.current = null;
+                    this._showNextToast();
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
